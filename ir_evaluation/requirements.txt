@@ -1,0 +1,11 @@
+scikit-learn
+rank_bm25
+nltk
+numpy
+ir_datasets
+ir_measures
+pyyaml
+pandas
+tqdm
+
+

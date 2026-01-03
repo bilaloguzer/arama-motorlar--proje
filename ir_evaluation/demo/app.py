@@ -16,8 +16,8 @@ sys.path.append(str(Path(__file__).parent.parent))
 from src.models.tfidf_model import TFIDFRetriever
 from src.models.bm25_model import BM25Retriever
 from src.models.rocchio_model import RocchioRetriever
-from src.data.loader import load_cisi_dataset
-from src.evaluation.metrics import precision_at_k, ndcg_at_k, average_precision
+from src.data.msmarco_loader import load_msmarco_subset
+from src.evaluation.metrics import ndcg_at_k
 import numpy as np
 
 # Page configuration
@@ -94,13 +94,15 @@ st.markdown("""
 @st.cache_resource
 def load_models():
     """Load and cache all models and data"""
-    with st.spinner("🔄 Loading dataset and initializing models... (This may take a minute)"):
-        # Load dataset
-        docs, queries, qrels = load_cisi_dataset()
+    with st.spinner("🔄 Loading MS MARCO dataset and initializing models... (This may take 1-2 minutes)"):
+        # Load MS MARCO dataset (10K documents for demo speed)
+        docs, queries, qrels = load_msmarco_subset(num_docs=10000, num_queries=100)
         
         # Get document IDs and texts
         doc_ids = list(docs.keys())
         doc_texts = [docs[doc_id] for doc_id in doc_ids]
+        
+        st.info(f"Loaded {len(docs)} documents and {len(queries)} queries from MS MARCO")
         
         # Initialize models (no preprocessing - models handle text directly)
         tfidf_model = TFIDFRetriever()
@@ -125,17 +127,30 @@ def load_models():
         }
 
 def calculate_query_metrics(retrieved_doc_ids, qrels, k=10):
-    """Calculate metrics for a single query"""
+    """Calculate metrics for a single query using simple precision/recall"""
     if not retrieved_doc_ids or not qrels:
-        return {'P@5': 0.0, 'P@10': 0.0, 'NDCG@10': 0.0, 'AP': 0.0}
+        return {'P@5': 0.0, 'P@10': 0.0, 'NDCG@10': 0.0, 'Relevant Found': 0}
     
-    relevant_docs = set(qrels)
+    relevant_docs = set(qrels.keys()) if isinstance(qrels, dict) else set(qrels)
+    
+    # Calculate precision@5 and precision@10
+    top_5 = retrieved_doc_ids[:5]
+    top_10 = retrieved_doc_ids[:10]
+    
+    p_at_5 = sum(1 for doc_id in top_5 if doc_id in relevant_docs) / 5.0
+    p_at_10 = sum(1 for doc_id in top_10 if doc_id in relevant_docs) / 10.0
+    
+    # Calculate NDCG@10
+    ndcg_score = ndcg_at_k(retrieved_doc_ids[:10], qrels)
+    
+    # Count relevant found
+    relevant_found = sum(1 for doc_id in retrieved_doc_ids if doc_id in relevant_docs)
     
     return {
-        'P@5': precision_at_k(retrieved_doc_ids[:5], relevant_docs),
-        'P@10': precision_at_k(retrieved_doc_ids[:10], relevant_docs),
-        'NDCG@10': ndcg_at_k(retrieved_doc_ids[:10], qrels),
-        'AP': average_precision(retrieved_doc_ids, relevant_docs)
+        'P@5': p_at_5,
+        'P@10': p_at_10,
+        'NDCG@10': ndcg_score,
+        'Relevant Found': relevant_found
     }
 
 def search_with_model(model, query, doc_ids, top_k=10):
@@ -208,7 +223,7 @@ def main():
         st.markdown("### 📊 Dataset Info")
         st.metric("Documents", f"{len(docs):,}")
         st.metric("Queries", f"{len(queries):,}")
-        st.metric("Relevance Judgments", f"{sum(len(v) for v in qrels.values()):,}")
+        st.metric("Dataset", "MS MARCO")
         
         st.markdown("---")
         
@@ -235,13 +250,21 @@ def main():
     if search_mode == "🔍 Custom Query":
         st.subheader("🔍 Custom Query Search")
         
+        # Initialize session state for query if not exists
+        if 'query_text' not in st.session_state:
+            st.session_state.query_text = ""
+        
         query_text = st.text_input(
             "Enter your search query:",
-            placeholder="e.g., information retrieval systems",
+            value=st.session_state.query_text,
+            placeholder="e.g., machine learning algorithms",
             help="Type any search query to find relevant documents"
         )
         
-        if st.button("🚀 Search") and query_text:
+        # Update session state
+        st.session_state.query_text = query_text
+        
+        if st.button("🚀 Search", key="custom_search_btn") and query_text:
             with st.spinner(f"Searching with {selected_model_name}..."):
                 model = models[selected_model_name]
                 results, search_time = search_with_model(model, query_text, doc_ids, top_k)
@@ -283,18 +306,26 @@ def main():
     elif search_mode == "📋 Sample Queries":
         st.subheader("📋 Sample Query Evaluation")
         
+        # Initialize session state
+        if 'selected_query_id' not in st.session_state:
+            st.session_state.selected_query_id = list(queries.keys())[0]
+        
         # Select a sample query
-        sample_query_ids = list(queries.keys())[:10]  # First 10 queries
+        sample_query_ids = list(queries.keys())[:20]  # First 20 queries
         selected_query_id = st.selectbox(
             "Select a sample query:",
             sample_query_ids,
+            index=sample_query_ids.index(st.session_state.selected_query_id) if st.session_state.selected_query_id in sample_query_ids else 0,
             format_func=lambda x: f"Query {x}: {queries[x][:80]}..."
         )
+        
+        # Update session state
+        st.session_state.selected_query_id = selected_query_id
         
         query_text = queries[selected_query_id]
         st.markdown(f"**Query:** {query_text}")
         
-        if st.button("🚀 Evaluate Query"):
+        if st.button("🚀 Evaluate Query", key="sample_query_btn"):
             with st.spinner(f"Evaluating with {selected_model_name}..."):
                 model = models[selected_model_name]
                 results, search_time = search_with_model(model, query_text, doc_ids, top_k)
@@ -317,7 +348,7 @@ def main():
                 with col4:
                     st.markdown(f'<div class="metric-box"><h4>NDCG@10</h4><h3>{metrics["NDCG@10"]:.2%}</h3></div>', unsafe_allow_html=True)
                 with col5:
-                    st.markdown(f'<div class="metric-box"><h4>AP</h4><h3>{metrics["AP"]:.2%}</h3></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="metric-box"><h4>Relevant</h4><h3>{metrics["Relevant Found"]}</h3></div>', unsafe_allow_html=True)
                 
                 st.markdown("---")
                 
@@ -353,13 +384,21 @@ def main():
     else:  # Model Comparison
         st.subheader("⚖️ Model Comparison")
         
+        # Initialize session state for comparison query
+        if 'comparison_query' not in st.session_state:
+            st.session_state.comparison_query = ""
+        
         query_text = st.text_input(
             "Enter query to compare models:",
-            placeholder="e.g., information retrieval evaluation",
+            value=st.session_state.comparison_query,
+            placeholder="e.g., machine learning classification",
             help="Compare how different models rank documents for the same query"
         )
         
-        if st.button("🚀 Compare Models") and query_text:
+        # Update session state
+        st.session_state.comparison_query = query_text
+        
+        if st.button("🚀 Compare Models", key="compare_models_btn") and query_text:
             st.markdown("---")
             
             # Create columns for each model
@@ -424,7 +463,7 @@ def main():
     <div style="text-align: center; color: #64748b; padding: 2rem 0;">
         <p><strong>Information Retrieval System Evaluation Project</strong></p>
         <p>Comparing Classical IR Algorithms: TF-IDF, BM25, and Rocchio</p>
-        <p>📊 Dataset: CISI (1,460 documents) | 🎓 Educational Demo</p>
+        <p>📊 Dataset: MS MARCO (10,000 documents) | 🎓 Educational Demo</p>
     </div>
     """, unsafe_allow_html=True)
 

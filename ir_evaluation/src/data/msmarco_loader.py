@@ -156,6 +156,31 @@ class KaggleDatasetLoader:
         # Create synthetic qrels (each query is relevant to its product)
         qrels = {q_id: {doc_id: 1} for q_id, doc_id in zip(q_ids, doc_ids)}
         
-        print(f"✓ Loaded {len(documents)} products")
+        print(f"✓ Loaded {len(documents)} products")        
         return documents, doc_ids, queries, q_ids, qrels
+
+def load_msmarco_subset(num_docs=10000, num_queries=100, dataset_name='msmarco-passage/dev/small'):
+    """
+    Convenience function to load MS MARCO subset.
+    
+    Args:
+        num_docs: Number of documents to load
+        num_queries: Number of queries to load
+        dataset_name: MS MARCO dataset variant
+        
+    Returns:
+        Tuple of (docs_dict, queries_dict, qrels_dict)
+    """
+    loader = MSMARCOLoader(dataset_name=dataset_name)
+    docs_list, doc_ids, queries_list, q_ids, qrels = loader.load(max_docs=num_docs)
+    
+    # Convert to dictionaries
+    docs = {doc_id: doc for doc_id, doc in zip(doc_ids, docs_list)}
+    queries_dict = {q_id: query for q_id, query in zip(q_ids[:num_queries], queries_list[:num_queries])}
+    
+    # Filter qrels to only include the queries we're using
+    filtered_qrels = {q_id: qrels[q_id] for q_id in queries_dict.keys() if q_id in qrels}
+    
+    return docs, queries_dict, filtered_qrels
+
 

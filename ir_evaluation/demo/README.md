@@ -75,11 +75,11 @@ The demo will open in your browser at `http://localhost:8501`
 
 ### Good Demo Queries:
 
-- `"information retrieval systems"`
-- `"document ranking algorithms"`
-- `"text processing and indexing"`
-- `"search engine evaluation"`
-- `"relevance feedback methods"`
+- `"machine learning classification"`
+- `"natural language processing"`
+- `"deep learning neural networks"`
+- `"computer vision algorithms"`
+- `"data mining techniques"`
 
 ## 🎨 UI Features
 
@@ -116,9 +116,10 @@ streamlit run ir_evaluation/demo/app.py --server.port 8502
 ### Slow initial load
 
 The first time you run the demo, it needs to:
-- Load the CISI dataset
+- Load 10,000 documents from MS MARCO
 - Build all three model indexes
-- This takes ~30 seconds, but is cached afterward
+- This takes ~1-2 minutes, but is cached afterward
+- Subsequent runs are instant!
 
 ## 🎓 During Your Presentation
 
@@ -126,7 +127,7 @@ The first time you run the demo, it needs to:
 
 1. **Architecture**: "This demo runs three classical IR models in real-time"
 
-2. **Dataset**: "We're searching through 1,460 scientific documents from the CISI collection"
+2. **Dataset**: "We're searching through 10,000 web passages from Microsoft's MS MARCO dataset"
 
 3. **Models**:
    - "TF-IDF uses vector space with cosine similarity"
@@ -135,7 +136,7 @@ The first time you run the demo, it needs to:
 
 4. **Performance**: "Notice the millisecond response times - efficient enough for production"
 
-5. **Evaluation**: "The green/red indicators show ground truth relevance from expert judgments"
+5. **Evaluation**: "The metrics show real relevance judgments from human assessors"
 
 ## 🔧 Customization
 

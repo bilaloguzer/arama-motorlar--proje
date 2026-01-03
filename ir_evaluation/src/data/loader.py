@@ -100,3 +100,15 @@ class DataLoader:
         
         print(f"Loaded {len(docs)} documents, {len(queries)} queries.")
         return docs, doc_ids, queries, q_ids, qrels
+
+def load_cisi_dataset(data_dir='ir_evaluation/data/raw'):
+    """Convenience function to load CISI dataset"""
+    loader = DataLoader(data_dir=data_dir)
+    docs_list, doc_ids, queries_list, q_ids, qrels = loader.load()
+    
+    # Convert to dictionaries for easier lookup
+    docs = {doc_id: doc for doc_id, doc in zip(doc_ids, docs_list)}
+    queries = {q_id: query for q_id, query in zip(q_ids, queries_list)}
+    
+    return docs, queries, qrels
+

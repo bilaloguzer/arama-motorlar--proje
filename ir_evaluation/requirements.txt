@@ -7,5 +7,6 @@ ir_measures
 pyyaml
 pandas
 tqdm
-
-
+streamlit>=1.28.0
+matplotlib>=3.7.0
+requests
